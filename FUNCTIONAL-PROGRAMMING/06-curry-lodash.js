@@ -21,9 +21,9 @@ console.log(curried(1)(3)(4));
 function myCurry(fn) {
   return function inner(...args) {
     if (args.length >= fn.length) {
-      return fn.apply(null, args);
+      return fn.apply(fn, args);
     } else {
-      return inner.bind(null, ...args);
+      return inner.bind(inner, ...args);
     }
   };
 }

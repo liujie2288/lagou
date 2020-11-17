@@ -1,16 +1,15 @@
-function flow(...fn) {
+function flow(...fns) {
   return (isRight = true) => {
     return (...args) => {
-      fn = isRight ? fn.reverse() : fn;
-      let first = fn.splice(0, 1)[0];
-      return fn.reduce((prev, item) => {
+      fns = isRight ? fns.reverse() : fns;
+      return fns.slice(1).reduce((prev, item) => {
         return item(prev);
-      }, first(...args));
+      }, fns[0](...args));
     };
   };
 }
 
-// 尖头函数简写
+// 箭头函数简写
 const flow1 = (...fn) => (isRight = true) => (...args) => {
   fn = isRight ? fn.reverse() : fn;
   let first = fn.splice(0, 1)[0];
