@@ -1,6 +1,17 @@
 // === 自己实现一个Promise类 ===
 
-// 问题1: 如何隐藏这些实例属性
+// 常见问题：
+// 1. error是如何冒泡的，为什么catch能捕捉到前面任意promise发生的错误？
+// 答： 可以理解为`catch`同`then`一样，只是为前一个promise注册回调，那么要想catch捕捉到最前的错误，只需要前面then返回的Promise
+//      都返回这个错误，那么最后的catch就能接收到该错了，也就是所谓的错误冒泡了。
+// 2. promise是如何实现延迟调用的？
+// 答： `then`注册的回调，可以先保存，然后当状态发生变化后，循环调用then注册的一次或多次回调。
+
+// 注意：
+// 1. Promise里面的执行器是立即调用的
+// 2. 就算执行器中没有异步代码，通过Promise的then方法添加的回调也会异步调用（添加进微任务队列中）
+// 3. 程序执行时，then方法会立即返回一个Promise，如果该promise的状态已经确定，对应回调会被立即添加进微任务队列，否则确定后，执行该添加操作
+// 4. 在每次执行宏每一个宏任务之前，都会先清空微任务队列，如果微任务又产生了新的微任务，也需要等待新的微任务执行完毕后，再执行下一个宏任务
 const PENDING = "pending";
 const FULFILLED = "fulfilled";
 const REJECTED = "rejected";
@@ -104,7 +115,7 @@ class MyPromise {
         this.onRejectedArr.push((value) => {
           // 捕获then中onReject异步调用中抛出的错误
           try {
-            // reject(onRejected(value))
+            // resolve(onRejected(value))
             resolveChainPromise(
               chainPromise,
               onRejected(value),
@@ -123,6 +134,44 @@ class MyPromise {
 
   catch(callback) {
     return this.then(undefined, callback);
+  }
+
+  // 1. 返回一个Promise实例
+  // 2. 传入的Promise**都完成**，该Promise变为resolve状态，其`resolveValue`为按传入顺序排列的每个Promise的`resolveValue`
+  // 3. 有任务一个失败，该Promise状态变为reject，同时`reject reason`为第一个Promise失败时候的结果
+  // 注意：
+  // 1. iterable必传
+  // 2. iterable中可以包含或者全是非promise,这些值会仍然被放到返回数组中
+  // 3. iterable如果为空，返回的Promise的状态会**同步**的更改为'resolved'，
+  // 4. iterable传入的 promise 都变为完成状态，或者传入的可迭代对象内没有 promise，Promise.all 返回的 promise 异步地变为完成。
+  static all(iterable) {
+    if (!iterable) throw new TypeError("undefined is not iterable");
+    const state = { count: 0, values: [] };
+    return new MyPromise((resolve, reject) => {
+      if (iterable.length === 0) {
+        resolve([]);
+        return;
+      }
+      const resolveCallback = (res, index) => {
+        state["count"] = state["count"] + 1;
+        state["values"][index] = res;
+        if (state["count"] === iterable.length) {
+          resolve(state["values"]);
+        }
+      };
+      iterable.forEach((promise, index) => {
+        if (promise instanceof MyPromise) {
+          promise.then(
+            (res) => resolveCallback(res, index),
+            (reason) => {
+              reject(reason);
+            }
+          );
+        } else {
+          resolveCallback(promise, index);
+        }
+      });
+    });
   }
 }
 
@@ -149,7 +198,6 @@ function resolveChainPromise(chainPromise, result, resolve, reject) {
     // 直接传入Promise确定后的回调，让Promise自己调用
     result.then(resolve, reject);
   } else {
-    console.log("123");
     resolve(result);
   }
 }
@@ -157,9 +205,40 @@ function resolveChainPromise(chainPromise, result, resolve, reject) {
 // module.exports = MyPromise;
 
 // === 测试用例 ===
+// 用例6: 测试all方法
+
+// MyPromise.all();
+// MyPromise.all([]);
+var p1 = new MyPromise(function (resolve, reject) {
+  setTimeout(() => {
+    reject(123);
+  }, 3000);
+});
+MyPromise.all([p1, 3]).then(
+  (res) => {
+    console.log(res);
+  },
+  (reason) => {
+    console.log(reason);
+  }
+);
+
+var p2 = new MyPromise(function (resolve, reject) {
+  resolve("haha");
+});
+MyPromise.all([p2, 3]).then(
+  (res) => {
+    console.log(res);
+  },
+  (reason) => {
+    console.log(reason);
+  }
+);
+
 // 用例5: 捕获错误
+/*
 console.log(
-  new Promise(function (resolve, reject) {
+  new MyPromise(function (resolve, reject) {
     setTimeout(() => {
       resolve("1");
     });
@@ -171,6 +250,7 @@ console.log(
 //   console.log(res);
 //   return "123";
 // });
+*/
 // 用例4:测试then方法回调异步调用(微任务)
 /*
 setTimeout(() => {

@@ -189,21 +189,49 @@ function resolvePromise(promsie2, x, resolve, reject) {
 //   console.log(value);
 // });
 
-var a3 = new MyPromise(function (resolve) {
-  setTimeout(() => {
-    resolve("1");
-  }, 300);
-}).then(() => {
-  console.log("dfsdf", a3);
-  return a3;
-});
+// var a3 = new MyPromise(function (resolve) {
+//   setTimeout(() => {
+//     resolve("1");
+//   }, 300);
+// }).then(() => {
+//   console.log("dfsdf", a3);
+//   return a3;
+// });
 
-a3.then(
+// a3.then(
+//   (res) => {
+//     console.log("biubiu1", res);
+//   },
+//   (error) => {
+//     console.log(error);
+//   }
+// );
+// console.log("a3", a3);
+
+var p1 = new MyPromise(function (resolve, reject) {
+  setTimeout(() => {
+    reject(123);
+  }, 3000);
+});
+MyPromise.all([p1, 3]).then(
   (res) => {
-    console.log("biubiu1", res);
+    console.log(res);
   },
-  (error) => {
-    console.log(error);
+  (reason) => {
+    console.log(reason);
   }
 );
-console.log("a3", a3);
+
+var p2 = new MyPromise(function (resolve, reject) {
+  setTimeout(() => {
+    resolve("haha");
+  }, 3000);
+});
+MyPromise.all([p2, 3]).then(
+  (res) => {
+    console.log(res);
+  },
+  (reason) => {
+    console.log(reason);
+  }
+);
