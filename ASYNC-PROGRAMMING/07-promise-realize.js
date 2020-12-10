@@ -136,6 +136,21 @@ class MyPromise {
     return this.then(undefined, callback);
   }
 
+  // 1. 无论当前Promise对象状态是什么，回调都会被执行
+  finally(callback) {
+    // return this.then(callback, callback);
+    return this.then(
+      (res) => {
+        callback();
+        return res;
+      },
+      (reason) => {
+        callback();
+        throw reason;
+      }
+    );
+  }
+
   // 1. 返回一个Promise实例
   // 2. 传入的Promise**都完成**，该Promise变为resolve状态，其`resolveValue`为按传入顺序排列的每个Promise的`resolveValue`
   // 3. 有任务一个失败，该Promise状态变为reject，同时`reject reason`为第一个Promise失败时候的结果
@@ -173,6 +188,19 @@ class MyPromise {
       });
     });
   }
+  // 返回一个给定值的Promise对象
+  // 注意：
+  // 1. 如果传入的值为Promise，将原样返回
+  // 2. 如果传入的值为一个`thenable`，返回的Promise将采用它最终的状态
+  static resolve(value) {
+    if (value instanceof MyPromise) return value;
+    if (typeof value === "object" && "then" in value) {
+      return new MyPromise(value.then);
+    }
+    return new MyPromise(function (resolve) {
+      resolve(value);
+    });
+  }
 }
 
 // 判断then方法中的返回值是否是Promise还是普通值
@@ -205,8 +233,41 @@ function resolveChainPromise(chainPromise, result, resolve, reject) {
 // module.exports = MyPromise;
 
 // === 测试用例 ===
+// 用例8: 测试finally方法
+var a8 = new MyPromise(function (resolve, reject) {
+  setTimeout(() => {
+    reject("1");
+  }, 3000);
+}).finally((res) => {
+  console.log("finally");
+});
+console.log(a8);
+setTimeout(() => {
+  console.log(a8);
+}, 3100);
+
+console.log(MyPromise.resolve(3).finally(() => {}));
+// 用例7: 测试resolve方法
+/*
+var a7 = MyPromise.resolve("123");
+console.log(a7, MyPromise.resolve(a7) === a7);
+
+var a71 = MyPromise.resolve({
+  then: function (resolve, reject) {
+    setTimeout(() => {
+      resolve("123");
+    }, 3000);
+  },
+});
+console.log(a71);
+setTimeout(() => {
+  console.log(a71);
+}, 3100);
+*/
+
 // 用例6: 测试all方法
 
+/*
 // MyPromise.all();
 // MyPromise.all([]);
 var p1 = new MyPromise(function (resolve, reject) {
@@ -234,6 +295,7 @@ MyPromise.all([p2, 3]).then(
     console.log(reason);
   }
 );
+*/
 
 // 用例5: 捕获错误
 /*
