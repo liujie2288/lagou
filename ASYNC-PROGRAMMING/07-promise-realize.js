@@ -6,6 +6,9 @@
 //      都返回这个错误，那么最后的catch就能接收到该错了，也就是所谓的错误冒泡了。
 // 2. promise是如何实现延迟调用的？
 // 答： `then`注册的回调，可以先保存，然后当状态发生变化后，循环调用then注册的一次或多次回调。
+// 3. then回调中返回Promise是如何同then返回的Promise状态同步的？
+// 答： 通过将then中创建的Promise`resolve`和`reject`函数作为then回调返回Promise的then的回调，当该Promise状态被确定，
+//      就自动调用传入的resolve或reject，从而改变then中返回的Promise状态，做到状态同步。
 
 // 注意：
 // 1. Promise里面的执行器是立即调用的
@@ -137,16 +140,21 @@ class MyPromise {
   }
 
   // 1. 无论当前Promise对象状态是什么，回调都会被执行
+  // 2. finally中返回Promise，可以被后面的then回调接收返回Promise的状态
   finally(callback) {
     // return this.then(callback, callback);
     return this.then(
       (res) => {
-        callback();
-        return res;
+        const result = callback();
+
+        return result instanceof MyPromise ? result : res;
       },
       (reason) => {
-        callback();
-        throw reason;
+        const result = callback();
+        if (result instanceof MyPromise) {
+          return callback();
+        }
+        return result instanceof MyPromise ? result : reason;
       }
     );
   }
@@ -239,14 +247,14 @@ var a8 = new MyPromise(function (resolve, reject) {
     reject("1");
   }, 3000);
 }).finally((res) => {
-  console.log("finally");
+  return MyPromise.resolve("123");
 });
 console.log(a8);
 setTimeout(() => {
   console.log(a8);
 }, 3100);
 
-console.log(MyPromise.resolve(3).finally(() => {}));
+// console.log(MyPromise.resolve(3).finally(() => {}));
 // 用例7: 测试resolve方法
 /*
 var a7 = MyPromise.resolve("123");
