@@ -137,15 +137,25 @@ class MyPromise {
   }
 
   // 1. 无论当前Promise对象状态是什么，回调都会被执行
+  // 2. 由于无法知道promise最终状态，finally的回调中不接受任务参数，
+  // 3. 与`Promise.resolve(2).then(()=>{},()=>{})`(结果为resolved undefined)不同，
+  //    `Promise.resolve(2).finally(()=>{})`的结果为resolved 2;
+  // 4. 与`Promise.reject(3).then(()=>{},()=>{})`(结果为rejected undefined)不同，
+  //    `Promise.reject(3).finally(()=>{})`的结果为rejected 3;
   finally(callback) {
+    // 1. 不简单等于与下面的代码（最开始的思路）
     // return this.then(callback, callback);
     return this.then(
       (res) => {
         callback();
+        // finally 后面的then要拿到前面Promise的结果（上面3，4点的要求）
+        // 所以需要返回值
         return res;
       },
       (reason) => {
         callback();
+        // finally 后面的then要拿到前面Promise的结果（上面3，4点的要求）
+        // 所以需要抛出错误
         throw reason;
       }
     );
