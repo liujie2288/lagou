@@ -6,6 +6,9 @@
 //      都返回这个错误，那么最后的catch就能接收到该错了，也就是所谓的错误冒泡了。
 // 2. promise是如何实现延迟调用的？
 // 答： `then`注册的回调，可以先保存，然后当状态发生变化后，循环调用then注册的一次或多次回调。
+// 3. then回调中返回Promise是如何同then返回的Promise状态同步的？
+// 答： 通过将then中创建的Promise`resolve`和`reject`函数作为then回调返回Promise的then的回调，当该Promise状态被确定，
+//      就自动调用传入的resolve或reject，从而改变then中返回的Promise状态，做到状态同步。
 
 // 注意：
 // 1. Promise里面的执行器是立即调用的
@@ -136,25 +139,53 @@ class MyPromise {
     return this.then(undefined, callback);
   }
 
+  // ======== finally方法要点 ========
   // 1. 无论当前Promise对象状态是什么，回调都会被执行
   // 2. 由于无法知道promise最终状态，finally的回调中不接受任务参数，
   // 3. 与`Promise.resolve(2).then(()=>{},()=>{})`(结果为resolved undefined)不同，
   //    `Promise.resolve(2).finally(()=>{})`的结果为resolved 2;
   // 4. 与`Promise.reject(3).then(()=>{},()=>{})`(结果为rejected undefined)不同，
   //    `Promise.reject(3).finally(()=>{})`的结果为rejected 3;
+  // 5. finally方法中只有返回错误的值（通过rejct或throw），才会更改finally返回的Promise状态以及值，
+  //    如果直接return或通过resolve返回，并不会更改finally返回的Promise状态，保留调用finally的Promise状态
   finally(callback) {
-    // 1. 不简单等于与下面的代码（最开始的思路）
+    // === 实现1: 不简单等于与下面的代码（最开始的思路） ====
+    // 不能解决上面3，4点的问题
     // return this.then(callback, callback);
+    // === 实现2: 不能解决上面5点的问题 ====
+    // return this.then(
+    //   (res) => {
+    //     callback();
+    //     // finally 后面的then要拿到前面Promise的结果（上面3，4点的要求）
+    //     // 所以需要返回值
+    //     return res;
+    //   },
+    //   (reason) => {
+    //     callback();
+    //     // finally 后面的then要拿到前面Promise的结果（上面3，4点的要求）
+    //     // 所以需要抛出错误
+    //     throw reason;
+    //   }
+    // );
+    // === 实现3: 终版 ====
     return this.then(
       (res) => {
-        callback();
-        // finally 后面的then要拿到前面Promise的结果（上面3，4点的要求）
+        const result = callback();
+        if (result instanceof MyPromise) {
+          return result.then(undefined, (reason) => {
+            throw reason;
+          });
+        }
         // 所以需要返回值
         return res;
       },
       (reason) => {
-        callback();
-        // finally 后面的then要拿到前面Promise的结果（上面3，4点的要求）
+        const result = callback();
+        if (result instanceof MyPromise) {
+          return result.then(undefined, (reason) => {
+            throw reason;
+          });
+        }
         // 所以需要抛出错误
         throw reason;
       }
@@ -247,16 +278,21 @@ function resolveChainPromise(chainPromise, result, resolve, reject) {
 var a8 = new MyPromise(function (resolve, reject) {
   setTimeout(() => {
     reject("1");
-  }, 3000);
+  }, 300);
 }).finally((res) => {
-  console.log("finally");
+  return new MyPromise(function (resolve, reject) {
+    setTimeout(() => {
+      reject("123");
+    }, 300);
+  });
+  // return MyPromise.resolve("123");
 });
 console.log(a8);
 setTimeout(() => {
   console.log(a8);
 }, 3100);
 
-console.log(MyPromise.resolve(3).finally(() => {}));
+// console.log(MyPromise.resolve(3).finally(() => {}));
 // 用例7: 测试resolve方法
 /*
 var a7 = MyPromise.resolve("123");
