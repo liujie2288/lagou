@@ -257,7 +257,7 @@ console.log("IIII");
 
 **JS引擎运行原理**
 
-<img src="/Users/Jay/Library/Mobile Documents/com~apple~CloudDocs/event-loop.png" alt="js事件循环"  />
+<img src="./event-loop.png" alt="js事件循环"  />
 
 **宏任务与微任务对比**
 
