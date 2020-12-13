@@ -9,12 +9,15 @@
 // 3. then回调中返回Promise是如何同then返回的Promise状态同步的？
 // 答： 通过将then中创建的Promise`resolve`和`reject`函数作为then回调返回Promise的then的回调，当该Promise状态被确定，
 //      就自动调用传入的resolve或reject，从而改变then中返回的Promise状态，做到状态同步。
+// 4. then回调中抛出异常是如何导致Promise状态变为rejected？
+// 答： 通过`try catch`捕捉到错误后，然后调用`reject`来改变then中返回的Promise状态
 
-// 注意：
+// 注意事项：
 // 1. Promise里面的执行器是立即调用的
 // 2. 就算执行器中没有异步代码，通过Promise的then方法添加的回调也会异步调用（添加进微任务队列中）
-// 3. 程序执行时，then方法会立即返回一个Promise，如果该promise的状态已经确定，对应回调会被立即添加进微任务队列，否则确定后，执行该添加操作
-// 4. 在每次执行宏每一个宏任务之前，都会先清空微任务队列，如果微任务又产生了新的微任务，也需要等待新的微任务执行完毕后，再执行下一个宏任务
+// 3. then方法是在为调用它的Promise注册回调，当调用它的Promise状态被确定，则执行对应的回调
+// 4. 程序执行时，then方法会立即返回一个Promise，如果该promise的状态已经确定，对应回调会被立即添加进微任务队列，否则待确定后，执行该添加操作
+// 5. 在每次执行宏每一个宏任务之前，都会先清空微任务队列，如果微任务又产生了新的微任务，也需要等待新的微任务执行完毕后，再执行下一个宏任务
 const PENDING = "pending";
 const FULFILLED = "fulfilled";
 const REJECTED = "rejected";
@@ -101,34 +104,40 @@ class MyPromise {
       if (this.status === PENDING) {
         // 这里通过包装函数，接收一个延迟设置chainPromise状态的值
         // 这样就可以在该Promise中异步更改（该Promise中的reslove,reject方法中更改chainPromise的值）chainPromise中的状态
-        this.onResolvedArr.push((value) => {
-          // 捕获then中onResolve异步调用中抛出的错误
-          try {
-            // resolve(onFulfilled(value));
-            resolveChainPromise(
-              chainPromise,
-              onFulfilled(value),
-              resolve,
-              reject
-            );
-          } catch (error) {
-            reject(error);
-          }
-        });
-        this.onRejectedArr.push((value) => {
-          // 捕获then中onReject异步调用中抛出的错误
-          try {
-            // resolve(onRejected(value))
-            resolveChainPromise(
-              chainPromise,
-              onRejected(value),
-              resolve,
-              reject
-            );
-          } catch (error) {
-            reject(error);
-          }
-        });
+        this.onResolvedArr.push((value) =>
+          // 因为是微任务异步调用，需要包裹成微任务
+          queueMicrotask(() => {
+            // 捕获then中onResolve异步调用中通过throw抛出的错误
+            try {
+              // resolve(onFulfilled(value));
+              resolveChainPromise(
+                chainPromise,
+                onFulfilled(value),
+                resolve,
+                reject
+              );
+            } catch (error) {
+              reject(error);
+            }
+          })
+        );
+        this.onRejectedArr.push((value) =>
+          // 因为是微任务异步调用，需要包裹成微任务
+          queueMicrotask(() => {
+            // 捕获then中onReject异步调用中通过throw抛出的错误
+            try {
+              // resolve(onRejected(value))
+              resolveChainPromise(
+                chainPromise,
+                onRejected(value),
+                resolve,
+                reject
+              );
+            } catch (error) {
+              reject(error);
+            }
+          })
+        );
       }
     });
     // 因为Promise的then方法是支持链式调用的，所以需要返回新的Promise对象。
@@ -172,9 +181,13 @@ class MyPromise {
       (res) => {
         const result = callback();
         if (result instanceof MyPromise) {
-          return result.then(undefined, (reason) => {
-            throw reason;
-          });
+          return result.then(
+            () => res,
+            // 可省略，then可选参数
+            (reason) => {
+              throw reason;
+            }
+          );
         }
         // 所以需要返回值
         return res;
@@ -182,9 +195,15 @@ class MyPromise {
       (reason) => {
         const result = callback();
         if (result instanceof MyPromise) {
-          return result.then(undefined, (reason) => {
-            throw reason;
-          });
+          return result.then(
+            () => {
+              throw reason;
+            },
+            // 可省略，then可选参数
+            (reason) => {
+              throw reason;
+            }
+          );
         }
         // 所以需要抛出错误
         throw reason;
@@ -201,7 +220,9 @@ class MyPromise {
   // 3. iterable如果为空，返回的Promise的状态会**同步**的更改为'resolved'，
   // 4. iterable传入的 promise 都变为完成状态，或者传入的可迭代对象内没有 promise，Promise.all 返回的 promise 异步地变为完成。
   static all(iterable) {
-    if (!iterable) throw new TypeError("undefined is not iterable");
+    // if (!iterable) throw new TypeError("undefined is not iterable");
+    if (!isIterable(iterable))
+      throw new TypeError(typeof iterable + " is not iterable");
     const state = { count: 0, values: [] };
     return new MyPromise((resolve, reject) => {
       if (iterable.length === 0) {
@@ -229,6 +250,61 @@ class MyPromise {
       });
     });
   }
+  // 1. 返回一个表示每一个Promise结果的对象数组(顺序同Promise传入顺序)的Promise对象
+  // 2. 返回的结果数组中结构Array<{status:'fulfilled'|'rejected',value?:any,reason?:any}> (成功返回value，失败返回reason)
+  // 应用场景：
+  // 多个彼此不依赖的异步任务成功完成或想知道每个Promise的结果（无论成功，失败）。
+  static allSettled(iterable) {
+    if (!isIterable(iterable))
+      throw new TypeError(typeof iterable + " is not iterable");
+    return new MyPromise(function (resolve) {
+      if (iterable.length === 0) {
+        resolve([]);
+        return;
+      }
+      const state = { count: 0, values: [] };
+      const resolveCallback = (result, index) => {
+        state.count++;
+        state.values[index] = result;
+        if (iterable.length === state.count) {
+          resolve(state.values);
+        }
+      };
+      iterable.forEach((promise, index) => {
+        if (promise instanceof MyPromise) {
+          promise.then(
+            (value) =>
+              resolveCallback({ status: FULFILLED, value: value }, index),
+            (reason) =>
+              resolveCallback({ status: REJECTED, reason: reason }, index)
+          );
+        } else {
+          resolveCallback({ status: FULFILLED, value: promise }, index);
+        }
+      });
+    });
+  }
+  // 1. 返回一个Promise实例
+  // 2. 迭代器中任何一个Promise变成fullfilled或rejected，那么返回的Promise就变成对应该Promise对应状态
+  // race： 竞赛（比速度），看谁先返回。
+  // 注意：
+  // 1. iterable如果为空，返回的Promise的永远等待
+  // 2. iterable中包含非Promise或者已经确定的Promise，则返回
+  // 应用场景
+  // 可以做请求超时判断，如果过了一段时间请求还没有返回，就返回包装超时的Promise信息，否则返回请求的数据
+  static race(iterable) {
+    if (!isIterable(iterable))
+      throw new TypeError(typeof iterable + " is not iterable");
+    return new MyPromise(function (resolve, reject) {
+      iterable.forEach((item) => {
+        if (item instanceof MyPromise) {
+          item.then(resolve, reject);
+        } else {
+          resolve(item);
+        }
+      });
+    });
+  }
   // 返回一个给定值的Promise对象
   // 注意：
   // 1. 如果传入的值为Promise，将原样返回
@@ -240,6 +316,13 @@ class MyPromise {
     }
     return new MyPromise(function (resolve) {
       resolve(value);
+    });
+  }
+
+  // 返回一个带有拒绝原因的Promise对象。
+  static reject(reason) {
+    return new MyPromise(function (resolve, reject) {
+      reject(reason);
     });
   }
 }
@@ -271,13 +354,110 @@ function resolveChainPromise(chainPromise, result, resolve, reject) {
   }
 }
 
+// 判断一个值是否是可迭代的
+function isIterable(obj) {
+  return obj != null && typeof obj[Symbol.iterator] === "function";
+}
+
 // module.exports = MyPromise;
+// export default MyPromise;
 
 // === 测试用例 ===
+// 用例11：测试allsettled方法
+const promise1 = MyPromise.resolve(3);
+const promise2 = new MyPromise((resolve, reject) =>
+  setTimeout(reject, 100, "foo")
+);
+const promises = [promise1, promise2];
+
+var a11 = MyPromise.allSettled(promises).then(
+  (results) => console.log(results)
+  // results.forEach((result) => console.log(result.status))
+);
+
+console.log(a11);
+setTimeout(() => {
+  console.log(a11);
+}, 1000);
+
+/*
+// 用例10: 测试race方法(异步特性)
+var resolvedPromisesArray = [MyPromise.resolve(33), MyPromise.resolve(44)];
+
+var p = MyPromise.race(resolvedPromisesArray);
+// immediately logging the value of p
+console.log(p);
+
+// using setTimeout we can execute code after the stack is empty
+setTimeout(function () {
+  console.log("the stack is now empty");
+  console.log(p);
+});
+// 测试race方法,结合setTimeout方法;
+var p1 = new MyPromise(function (resolve, reject) {
+  setTimeout(resolve, 500, "one");
+});
+var p2 = new MyPromise(function (resolve, reject) {
+  setTimeout(resolve, 100, "two");
+});
+
+MyPromise.race([p1, p2]).then(function (value) {
+  console.log(value); // "two"
+  // 两个都完成，但 p2 更快
+});
+
+var p3 = new MyPromise(function (resolve, reject) {
+  setTimeout(resolve, 100, "three");
+});
+var p4 = new MyPromise(function (resolve, reject) {
+  setTimeout(reject, 500, "four");
+});
+
+MyPromise.race([p3, p4]).then(
+  function (value) {
+    console.log(value); // "three"
+    // p3 更快，所以它完成了
+  },
+  function (reason) {
+    // 未被调用
+  }
+);
+
+var p5 = new MyPromise(function (resolve, reject) {
+  setTimeout(resolve, 500, "five");
+});
+var p6 = new MyPromise(function (resolve, reject) {
+  setTimeout(reject, 100, "six");
+});
+
+MyPromise.race([p5, p6]).then(
+  function (value) {
+    // 未被调用
+  },
+  function (reason) {
+    console.log(reason); // "six"
+    // p6 更快，所以它失败了
+  }
+);
+*/
+/*
+// 用例9: 测试reject方式
+console.log(
+  MyPromise.reject(new Error("123")).then(
+    () => {
+      console.log("resolved");
+    },
+    (reason) => {
+      console.log("reject", reason);
+    }
+  )
+);
+*/
+/*
 // 用例8: 测试finally方法
 var a8 = new MyPromise(function (resolve, reject) {
   setTimeout(() => {
-    reject("1");
+    resolve("1");
   }, 300);
 }).finally((res) => {
   return new MyPromise(function (resolve, reject) {
@@ -290,9 +470,10 @@ var a8 = new MyPromise(function (resolve, reject) {
 console.log(a8);
 setTimeout(() => {
   console.log(a8);
-}, 3100);
+}, 3000);
 
-// console.log(MyPromise.resolve(3).finally(() => {}));
+console.log(MyPromise.resolve(3).finally(() => { }));
+*/
 // 用例7: 测试resolve方法
 /*
 var a7 = MyPromise.resolve("123");
