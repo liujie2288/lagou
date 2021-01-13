@@ -1,5 +1,3 @@
-[TOC]
-
 # Javascript异步编程
 ---
 
