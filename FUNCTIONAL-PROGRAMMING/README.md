@@ -179,7 +179,7 @@ forEach(arr,(item)=>{console.log(item)}
 
 纯函数类似数学中的函数，用来描述输入与输出的关系。例如：y=f(x)。
 
-![函数映射关系](./images/closure.png)
+![函数映射关系](./images/pure-function.png)
 
 示例：
 
