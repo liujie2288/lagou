@@ -167,7 +167,7 @@ forEach(arr,(item)=>{console.log(item)}
 
 案例：
 
-<img src="./closure.png" alt="closure" style="zoom:50%;" />
+![closure](./images/closure.png)
 
 
 
@@ -179,7 +179,7 @@ forEach(arr,(item)=>{console.log(item)}
 
 纯函数类似数学中的函数，用来描述输入与输出的关系。例如：y=f(x)。
 
-<img src="./pure-function.png" alt="函数映射关系" style="zoom:50%;" />
+![函数映射关系](./images/closure.png)
 
 示例：
 

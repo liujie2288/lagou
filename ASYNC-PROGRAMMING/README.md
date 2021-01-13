@@ -25,7 +25,7 @@
 
 发布订阅：监听者和事件主体解偶，通过第三方的事件对象（自定义事件对象类，实现`listen`订阅，`trigger`发布，`remove`取消等功能）联系在这一起。
 
-![img](./事件机制与发布订阅区别.png)
+![img](./images/事件机制与发布订阅区别.png)
 
 使用回调函数编写异步代码会出现回调地狱等问题，代码不易阅读与维护。因此`ECMAScript`提供了`Promise`、`Generator`、`Async Await`新语法来解决异步代码编写问题。
 
@@ -255,7 +255,7 @@ console.log("IIII");
 
 **JS引擎运行原理**
 
-<img src="./event-loop.png" alt="js事件循环"  />
+![js事件循环](./images/event-loop.png)
 
 **宏任务与微任务对比**
 
