@@ -1,6 +1,3 @@
-# lagou
-拉勾高薪训练营课程代码
-
 ## ASYNC-PROGRAMMING
 异步编程相关代码
 - 01-promise-ajax.js   通过Promise封装ajax请求
