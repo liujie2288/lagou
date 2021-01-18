@@ -15,4 +15,7 @@
 - 02-closure          认识闭包
 - 03-lodash           lodash库使用
 - 04-memoize.js       自己实现memoize函数
-- 
+
+## Flow
+flow工具的使用
+- 01-getting-started flow快速入门
