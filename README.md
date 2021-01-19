@@ -19,3 +19,7 @@
 ## Flow
 flow工具的使用
 - 01-getting-started flow快速入门
+- 02-type-annotations flow类型注解
+- 03-primitive-types.js flow数据类型
+- 04-mixed-any.js flow 任意类型以及它们的区别
+- 05-runtime-apis.js flow 运行时 apis支持
