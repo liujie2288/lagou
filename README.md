@@ -34,4 +34,14 @@ flow 工具的使用
 ## Typescript
 
 - 01-getting-started.ts typescript 基本使用
+- 02-primitive-types.ts typescript 原始类型
 - 03-typescript-lib.ts typescript 标准库介绍
+- 04-module-scope.ts 作用域问题
+- 05-object-type.ts object类型
+- 06-array-type.ts 数组类型
+- 07-tuple-type.ts 元组类型
+- 08-enum-type.ts 枚举类型
+- 09-function-type.ts 函数类型
+- 10-interface-type.ts 接口类型
+- 11-module-export-type.ts 模块导出类型
+- 12-module-export-statements.ts 模块导出语句（重命名）

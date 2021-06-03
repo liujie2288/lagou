@@ -9,4 +9,6 @@ var Gender;
 })(Gender || (Gender = {}));
 console.log(Gender.Female);
 console.log(0 /* Success */);
+var a = "123";
+exports.a = a;
 //# sourceMappingURL=08-enum-type.js.map
