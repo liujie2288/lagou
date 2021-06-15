@@ -1,3 +1,4 @@
+// 使用回调标记任务完成
 exports.javascript = function (done) {
   // 这里来书写任务构建逻辑
   console.log("js代码编译转换");
@@ -7,6 +8,7 @@ exports.javascript = function (done) {
   // done(new Error("编译失败"));
 };
 
+// 使用Promise来状态来表示任务状态
 exports.scss = function () {
   return new Promise(function (resolve, reject) {
     // 模拟异步耗时任务
@@ -16,6 +18,7 @@ exports.scss = function () {
   });
 };
 
+// 使用Promise来状态来表示任务状态
 exports.ejs = async function () {
   await new Promise((resolve) => {
     setTimeout(() => {
@@ -25,20 +28,20 @@ exports.ejs = async function () {
   console.log("done");
 };
 
+// 返回Stream，gulp内部会监听"onend"事件
 const fs = require("fs");
 const { Transform } = require("stream");
 exports.txt = function () {
-  return fs
-    .createReadStream("./hello.txt")
-    .pipe(
-      new Transform({
-        transform: function (chunk, encoding, callback) {
-          const data = chunk.toString().replace("world", "gulp");
-          callback(null, data);
-        },
-      })
-    )
-    .pipe(fs.createWriteStream("./output.txt"));
+  const src = fs.createReadStream("./hello.txt");
+  const transform = new Transform({
+    transform: function (chunk, encoding, callback) {
+      const data = chunk.toString().replace("world", "gulp");
+      callback(null, data);
+    },
+  })
+  const dest = fs.createWriteStream("./output.txt");
+
+  return src.pipe(transform).pipe(dest);
 };
 
 const { src, dest } = require("gulp");
